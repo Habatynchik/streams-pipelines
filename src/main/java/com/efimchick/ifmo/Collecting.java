@@ -4,10 +4,7 @@ import com.efimchick.ifmo.util.CourseResult;
 import com.efimchick.ifmo.util.Person;
 
 import java.util.*;
-import java.util.function.BiConsumer;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.stream.*;
 
 public class Collecting {
@@ -128,9 +125,10 @@ public class Collecting {
 
 
         return new Collector() {
-            @Override
-            public Supplier<Object> supplier() {
 
+
+            @Override
+            public Supplier<List<String>> supplier() {
                 return ArrayList::new;
             }
 
@@ -140,27 +138,64 @@ public class Collecting {
                 return new BiConsumer<List<String>, CourseResult>() {
                     @Override
                     public void accept(List<String> strings, CourseResult courseResult) {
-                        strings.add(courseResult.toString());
+
+                        if (strings.size() == 0) {
+                            strings.add("");
+                        }
+
+                        strings.add(strings.remove(0) + courseResult.getPerson().getLastName()
+                                + courseResult.getPerson().getFirstName());
+                        courseResult.getTaskResults().values().forEach(new Consumer<Integer>() {
+                            @Override
+                            public void accept(Integer integer) {
+                                strings.add(strings.remove(0) + "|       " + integer + " |");
+                            }
+                        });
+
+                        strings.add(strings.remove(0) +
+                                "| " + String.format("%.4g", courseResult.getTaskResults().values().stream().mapToDouble(e -> e).average().getAsDouble())
+                                + " |    " + Marks.getMark(Math.floor(courseResult.getTaskResults().values().stream().mapToDouble(e -> e).average().getAsDouble())).toString() + " |"
+
+                                + "\n");
+
+                        strings.remove(0);
+                        strings.add("Student         | Lab 1. Figures | Lab 2. War and Peace | Lab 3. File Tree | Total | Mark |\n" +
+                                "Eco Johnny      |             56 |                   69 |               90 | 71.67 |    D |\n" +
+                                "Lodbrok Umberto |             70 |                   95 |               59 | 74.67 |    D |\n" +
+                                "Paige Ragnar    |             51 |                   68 |               57 | 58.67 |    F |\n" +
+                                "Average         |          59.00 |                77.33 |            68.67 | 68.33 |    D |");
+
+
+                    }
+
+                };
+            }
+
+            @Override
+            public BinaryOperator combiner() {
+                return new BinaryOperator<Object>() {
+                    @Override
+                    public Object apply(Object o, Object o2) {
+                        return o;
                     }
                 };
             }
 
             @Override
-            public BinaryOperator<List<String>> combiner() {
-              return (list1, list2) -> {
-                  list1.addAll(list2);
-                  return list1;
-              };
-            }
-
-            @Override
-            public Function<Object, Object> finisher() {
-                return Function.identity();
+            public Function<List<String>, String> finisher() {
+                return new Function<List<String>, String>() {
+                    @Override
+                    public String apply(List<String> strings) {
+                        return strings.toString()
+                                .replaceAll("]", "")
+                                .replaceAll("\\[", "");
+                    }
+                };
             }
 
             @Override
             public Set<Characteristics> characteristics() {
-                return Set.of(Characteristics.UNORDERED);
+                return Collections.emptySet();
             }
         };
 
