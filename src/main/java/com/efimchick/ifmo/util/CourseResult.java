@@ -16,6 +16,9 @@ public class CourseResult {
     }
 
     public Map<String, Integer> getTaskResults() {
+        System.out.println(person);
+        System.out.println(taskResults);
+        System.out.println();
         return taskResults;
     }
 }
