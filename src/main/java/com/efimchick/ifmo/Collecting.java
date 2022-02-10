@@ -1,3 +1,5 @@
+
+
 package com.efimchick.ifmo;
 
 import com.efimchick.ifmo.util.CourseResult;
@@ -121,85 +123,141 @@ public class Collecting {
                 .getKey();
     }
 
-    Collector printableStringCollector() {
-
-
-        return new Collector() {
-
-
+    public Collector<CourseResult, Map<Person, Map<String, Integer>>, String> printableStringCollector() {
+        return new Collector<CourseResult, Map<Person, Map<String, Integer>>, String>() {
             @Override
-            public Supplier<List<String>> supplier() {
-                return ArrayList::new;
+            public Supplier<Map<Person, Map<String, Integer>>> supplier() {
+                return () -> new TreeMap<>(Comparator.comparing(Person::getLastName));
             }
 
             @Override
-            public BiConsumer<List<String>, CourseResult> accumulator() {
+            public BiConsumer<Map<Person, Map<String, Integer>>, CourseResult> accumulator() {
+                return (map, courseResult) -> map.put(courseResult.getPerson(), courseResult.getTaskResults());
+            }
 
-                return new BiConsumer<List<String>, CourseResult>() {
-                    @Override
-                    public void accept(List<String> strings, CourseResult courseResult) {
-
-                        if (strings.size() == 0) {
-                            strings.add("");
-                        }
-
-                        strings.add(strings.remove(0) + courseResult.getPerson().getLastName()
-                                + courseResult.getPerson().getFirstName());
-                        courseResult.getTaskResults().values().forEach(new Consumer<Integer>() {
-                            @Override
-                            public void accept(Integer integer) {
-                                strings.add(strings.remove(0) + "|       " + integer + " |");
-                            }
-                        });
-
-                        strings.add(strings.remove(0) +
-                                "| " + String.format("%.4g", courseResult.getTaskResults().values().stream().mapToDouble(e -> e).average().getAsDouble())
-                                + " |    " + Marks.getMark(Math.floor(courseResult.getTaskResults().values().stream().mapToDouble(e -> e).average().getAsDouble())).toString() + " |"
-
-                                + "\n");
-
-                        strings.remove(0);
-                        strings.add("Student         | Lab 1. Figures | Lab 2. War and Peace | Lab 3. File Tree | Total | Mark |\n" +
-                                "Eco Johnny      |             56 |                   69 |               90 | 71.67 |    D |\n" +
-                                "Lodbrok Umberto |             70 |                   95 |               59 | 74.67 |    D |\n" +
-                                "Paige Ragnar    |             51 |                   68 |               57 | 58.67 |    F |\n" +
-                                "Average         |          59.00 |                77.33 |            68.67 | 68.33 |    D |");
-
-
-                    }
-
+            @Override
+            public BinaryOperator<Map<Person, Map<String, Integer>>> combiner() {
+                return (map1, map2) -> {
+                    map1.putAll(map2);
+                    return map1;
                 };
             }
 
             @Override
-            public BinaryOperator combiner() {
-                return new BinaryOperator<Object>() {
-                    @Override
-                    public Object apply(Object o, Object o2) {
-                        return o;
-                    }
-                };
-            }
-
-            @Override
-            public Function<List<String>, String> finisher() {
-                return new Function<List<String>, String>() {
-                    @Override
-                    public String apply(List<String> strings) {
-                        return strings.toString()
-                                .replaceAll("]", "")
-                                .replaceAll("\\[", "");
-                    }
-                };
+            public Function<Map<Person, Map<String, Integer>>, String> finisher() {
+                return map -> String.valueOf(parser(map));
             }
 
             @Override
             public Set<Characteristics> characteristics() {
-                return Collections.emptySet();
+                return Set.of(Characteristics.UNORDERED);
             }
         };
+    }
+
+    private StringBuilder parser(Map<Person, Map<String, Integer>> map) {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        int lengthOfLongestName = getLengthLongestName(map);
+
+        List<String> sortedCourses = map.values()
+                .stream()
+                .flatMap(m -> m.keySet().stream())
+                .distinct().sorted().collect(Collectors.toList());
+        System.out.println(sortedCourses);
+
+        stringBuilder.append("Student").append(getSpaces(lengthOfLongestName - 6)).append("| ");
+
+        for (String sortedCours : sortedCourses) {
+            stringBuilder.append(sortedCours).append(" | ");
+        }
+
+        stringBuilder.append("Total | ").append("Mark |\n");
+
+        for (Map.Entry<Person, Map<String, Integer>> courses : map.entrySet()) {
+            stringBuilder
+                    .append(courses.getKey().getLastName())
+                    .append(" ")
+                    .append(courses.getKey().getFirstName())
+                    .append(getSpaces(lengthOfLongestName - courses.getKey().getFirstName().length() - courses.getKey().getLastName().length() - 1))
+                    .append(" | ");
+            for (String sortedCours : sortedCourses) {
+
+                if (courses.getValue().containsKey(sortedCours)) {
+                    stringBuilder          //append number of spaces
+                            .append(getSpaces(sortedCours.length() - courses.getValue().get(sortedCours).toString().length()))
+                            .append(courses.getValue().get(sortedCours))
+                            .append(" | ");
+                } else {
+                    stringBuilder
+                            .append(getSpaces(sortedCours.length() - 1))
+                            .append("0")
+                            .append(" | ");
+                }
+
+            }
+            stringBuilder
+                    .append(getTotalScore(courses.getValue(), sortedCourses.size()))
+                    .append(" |    ")
+                    .append(Marks.getMark(Double.parseDouble(getTotalScore(courses.getValue(), sortedCourses.size()))).toString())
+                    .append(" |\n");
+
+        }
+        stringBuilder.append("Average").append(getSpaces(lengthOfLongestName - 6)).append("|").append(getAverage(map, sortedCourses));
+        return stringBuilder;
+    }
+
+    private String getAverage(Map<Person, Map<String, Integer>> coursesMap, List<String> sortedCourses) {
+        StringBuilder sb = new StringBuilder();
+        long numberOfCourses = coursesMap.values().stream()
+                .mapToLong(map -> map.keySet().size()).count();
+
+        Map<String, Double> mapOfCourses = coursesMap.values().stream()
+                .flatMap(map -> map.entrySet().stream())
+                .collect(Collectors.toMap(Map.Entry::getKey, value -> Double.valueOf(value.getValue()), (v1, v2) -> v1 = v1 + v2));
+
+        mapOfCourses.replaceAll((k, v) -> v / numberOfCourses);
+
+        for (int i = 0; i < mapOfCourses.values().size(); i++) {
+            sb          //append number of spaces
+                    .append(getSpaces(sortedCourses.get(i).length() - 4))
+                    .append(String.format(Locale.US, "%.2f", mapOfCourses.get(sortedCourses.get(i))))
+                    .append(" |");
+
+        }
+        sb
+                .append(" ")
+                .append(getTotalScoreDouble(mapOfCourses))
+                .append(" |    ")
+                .append(Marks.getMark(Double.parseDouble(getTotalScoreDouble(mapOfCourses))).toString())
+                .append(" |");
+        return sb.toString();
+    }
+
+    private String getSpaces(int length) {
+        return " ".repeat(Math.max(0, length));
+    }
+
+    private int getLengthLongestName(Map<Person, Map<String, Integer>> map) {
+        return map.keySet()
+                .stream()
+                .mapToInt(person -> person.getLastName().length() + person.getFirstName().length() + 1)
+                .max().getAsInt();
+    }
+
+    private String getTotalScore(Map<String, Integer> courseStream, int numberOfCourses) {
+        double sum = courseStream.values().stream().mapToDouble(Integer::doubleValue).sum();
+        return String.format(Locale.US, "%.2f", sum / numberOfCourses);
 
     }
+
+    private String getTotalScoreDouble(Map<String, Double> courseStream) {
+        long numberOfCourses = courseStream.keySet().stream().distinct().count();
+        double sum = courseStream.values().stream().mapToDouble(Double::doubleValue).sum();
+        return String.format(Locale.US, "%.2f", sum / numberOfCourses);
+
+    }
+
 
     /*
     public interface Collector<T, A, R> {
@@ -228,7 +286,7 @@ public class Collecting {
         public static Marks getMark(double mark) {
 
             for (Marks i : Marks.values()) {
-                if (i.mark >= mark) {
+                if (i.mark >= Math.floor(mark)) {
                     return i;
                 }
             }
@@ -236,3 +294,4 @@ public class Collecting {
         }
     }
 }
+
