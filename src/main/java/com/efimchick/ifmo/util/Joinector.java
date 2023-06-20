@@ -18,9 +18,6 @@ public class Joinector implements Collector<CharSequence, StringJoiner, String> 
                 StringJoiner::toString);           // finisher
     }
 
-    public static void main(String[] args) {
-        System.out.println();
-    }
     private final CharSequence delimiter;
 
     public Joinector(CharSequence delimiter) {

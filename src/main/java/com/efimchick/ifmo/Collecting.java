@@ -1,25 +1,27 @@
-
-
 package com.efimchick.ifmo;
 
 import com.efimchick.ifmo.util.CourseResult;
 import com.efimchick.ifmo.util.Person;
 
 import java.util.*;
-import java.util.function.*;
-import java.util.stream.*;
+import java.util.function.BiConsumer;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class Collecting {
 
     int sum(IntStream stream) {
-        return stream
-                .sum();
+        return stream.sum();
     }
 
 
     int production(IntStream stream) {
-        return stream
-                .reduce(1, (x, y) -> x * y);
+        return stream.reduce(1, (x, y) -> x * y);
     }
 
     int oddSum(IntStream stream) {
@@ -36,12 +38,12 @@ public class Collecting {
 
 
     Map<Person, Double> totalScores(Stream<CourseResult> stream) {
-        List<CourseResult> list = stream.collect(Collectors.toList());
+        List<CourseResult> list = stream.toList();
 
-        long counter = list.stream().map(CourseResult::getTaskResults).flatMap(map -> map.keySet().stream()).distinct().count();
+        long counter = getCountOfTasks(list);
 
         return list.stream().collect(Collectors
-                .toMap(k -> k.getPerson(),
+                .toMap(CourseResult::getPerson,
                         v -> v.getTaskResults()
                                 .values()
                                 .stream()
@@ -51,14 +53,11 @@ public class Collecting {
         );
     }
 
-    double averageTotalScore(Stream<CourseResult> stream) {
-        List<CourseResult> list = stream.collect(Collectors.toList());
 
-        long counter = list.stream()
-                .map(CourseResult::getTaskResults)
-                .flatMap(map -> map.keySet().stream())
-                .distinct()
-                .count();
+    double averageTotalScore(Stream<CourseResult> stream) {
+        List<CourseResult> list = stream.toList();
+
+        long counter = getCountOfTasks(list);
 
         long people = list.size();
 
@@ -71,25 +70,26 @@ public class Collecting {
                 .sum() / (counter * people);
     }
 
-    Map<String, Double> averageScoresPerTask(Stream<CourseResult> stream) {
-        List<CourseResult> list = stream.collect(Collectors.toList());
 
-        double people = list.size();
+    Map<String, Double> averageScoresPerTask(Stream<CourseResult> stream) {
+        List<CourseResult> list = stream.toList();
+
+        double peoples = list.size();
 
         return list.stream()
                 .map(CourseResult::getTaskResults)
                 .flatMap(map -> map.entrySet().stream())
-                .collect(Collectors.toMap(k -> k.getKey().toString(), v -> v.getValue().doubleValue() / people, Double::sum, HashMap::new));
+                .collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue().doubleValue() / peoples, Double::sum, HashMap::new));
 
     }
 
     Map<Person, String> defineMarks(Stream<CourseResult> stream) {
-        List<CourseResult> list = stream.collect(Collectors.toList());
+        List<CourseResult> list = stream.toList();
 
         long counter = list.stream().map(CourseResult::getTaskResults).flatMap(map -> map.keySet().stream()).distinct().count();
 
         return list.stream().collect(Collectors
-                .toMap(k -> k.getPerson(),
+                .toMap(CourseResult::getPerson,
                         v -> Marks.getMark(v.getTaskResults()
                                 .values()
                                 .stream()
@@ -97,30 +97,22 @@ public class Collecting {
                                 .sum() / counter).toString()
                 )
         );
-        /*
-        if you need sorted map
-                .entrySet().stream().sorted(Map.Entry.comparingByValue()).collect(Collectors.toMap(
-                Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
-                */
     }
 
     String easiestTask(Stream<CourseResult> stream) {
-
-
-        List<CourseResult> list = stream.collect(Collectors.toList());
+        List<CourseResult> list = stream.toList();
 
         double people = list.size();
-
 
         return list.stream()
                 .map(CourseResult::getTaskResults)
                 .flatMap(map -> map.entrySet().stream())
-                .collect(Collectors.toMap(k -> k.getKey().toString(), v -> v.getValue().doubleValue() / people, Double::sum, HashMap::new))
+                .collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue().doubleValue() / people, Double::sum, HashMap::new))
                 .entrySet()
                 .stream()
-                .max((o1, o2) -> (int) Math.floor(o1.getValue() - o2.getValue()))
-                .get()
-                .getKey();
+                .max(Comparator.comparingDouble(Map.Entry::getValue))
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     public Collector<CourseResult, Map<Person, Map<String, Integer>>, String> printableStringCollector() {
@@ -163,8 +155,7 @@ public class Collecting {
         List<String> sortedCourses = map.values()
                 .stream()
                 .flatMap(m -> m.keySet().stream())
-                .distinct().sorted().collect(Collectors.toList());
-        System.out.println(sortedCourses);
+                .distinct().sorted().toList();
 
         stringBuilder.append("Student").append(getSpaces(lengthOfLongestName - 6)).append("| ");
 
@@ -181,16 +172,16 @@ public class Collecting {
                     .append(courses.getKey().getFirstName())
                     .append(getSpaces(lengthOfLongestName - courses.getKey().getFirstName().length() - courses.getKey().getLastName().length() - 1))
                     .append(" | ");
-            for (String sortedCours : sortedCourses) {
+            for (String sortedCourse : sortedCourses) {
 
-                if (courses.getValue().containsKey(sortedCours)) {
+                if (courses.getValue().containsKey(sortedCourse)) {
                     stringBuilder          //append number of spaces
-                            .append(getSpaces(sortedCours.length() - courses.getValue().get(sortedCours).toString().length()))
-                            .append(courses.getValue().get(sortedCours))
+                            .append(getSpaces(sortedCourse.length() - courses.getValue().get(sortedCourse).toString().length()))
+                            .append(courses.getValue().get(sortedCourse))
                             .append(" | ");
                 } else {
                     stringBuilder
-                            .append(getSpaces(sortedCours.length() - 1))
+                            .append(getSpaces(sortedCourse.length() - 1))
                             .append("0")
                             .append(" | ");
                 }
@@ -239,10 +230,12 @@ public class Collecting {
     }
 
     private int getLengthLongestName(Map<Person, Map<String, Integer>> map) {
-        return map.keySet()
+        OptionalInt maxNameLength = map.keySet()
                 .stream()
                 .mapToInt(person -> person.getLastName().length() + person.getFirstName().length() + 1)
-                .max().getAsInt();
+                .max();
+
+        return maxNameLength.orElse(0);
     }
 
     private String getTotalScore(Map<String, Integer> courseStream, int numberOfCourses) {
@@ -258,16 +251,13 @@ public class Collecting {
 
     }
 
-
-    /*
-    public interface Collector<T, A, R> {
-        Supplier<A> supplier();
-        BiConsumer<A, T> accumulator();
-        Function<A, R> finisher();
-        BinaryOperator<A> combiner();
-        Set<Characteristics> characteristics();
+    private long getCountOfTasks(List<CourseResult> courseResultList) {
+        return courseResultList.stream()
+                .map(CourseResult::getTaskResults)
+                .flatMap(map -> map.keySet().stream())
+                .distinct()
+                .count();
     }
-     */
 
     enum Marks {
         F(59),
@@ -281,7 +271,7 @@ public class Collecting {
             this.mark = mark;
         }
 
-        private double mark;
+        private final double mark;
 
         public static Marks getMark(double mark) {
 
